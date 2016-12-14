@@ -14,6 +14,9 @@
       "**/vendor/**"
     ]
   },
+  "dependencies": {
+    "webpack-dev-server": "^1.16.1"
+  },
   "devDependencies": {
     "cross-env": "^2.0.1",
     "semistandard": "^9.0.0",
