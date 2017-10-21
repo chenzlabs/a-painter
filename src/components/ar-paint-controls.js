@@ -1,6 +1,3 @@
-AFRAME.registerSystem('ar-paint-controls', {
-  numberStrokes: 0
-});
 
 /* globals AFRAME THREE */
 AFRAME.registerComponent('ar-paint-controls', {
@@ -10,12 +7,11 @@ AFRAME.registerComponent('ar-paint-controls', {
     var el = this.el;
     this.controller = null;
 
+    this.pressure = 0;
     this.size = el.sceneEl.renderer.getSize();
     this.pointer = new THREE.Vector2();
     // normalized device coordinates position
-    this.pointerNdc = new THREE.Vector2();
-
-    this.numberStrokes = 0;
+    this.normalizedCoordinatedPositionPointer = new THREE.Vector2();
 
     this.raycaster = el.components.raycaster.raycaster;
     // this.el.components.raycaster.showLine = true;
@@ -68,13 +64,20 @@ AFRAME.registerComponent('ar-paint-controls', {
     }
   },
   onBrushChanged: function (evt) {
-    this.el.setAttribute('material', 'color', evt.detail.color);
-    this.getGazeScale(evt.detail.size);
-    this.el.setAttribute('brush', 'color', evt.detail.color);
-    this.el.setAttribute('brush', 'brush', evt.detail.brush);
-    this.el.setAttribute('brush', 'size', evt.detail.size);
+    if (evt.detail.brush.color !== this.el.getAttribute('brush').color) {
+      this.el.setAttribute('brush', 'color', evt.detail.brush.color);
+      this.el.setAttribute('material', 'color', evt.detail.brush.color);
+    }
+    this.pressure = evt.detail.pressure;
+    // this.el.components.brush.sizeModifier = evt.detail.pressure;
+    console.log(evt.detail);
+    this.setGazeScale(evt.detail.brush.size);
+    if (evt.detail.brush !== this.el.getAttribute('brush').brush) {
+      this.el.setAttribute('brush', 'brush', evt.detail.brush.brush);
+    } 
+    this.el.setAttribute('brush', 'size', evt.detail.brush.size);
   },
-  getGazeScale: function (size) {
+  setGazeScale: function (size) {
     var sizeData = this.el.components.brush.schema.size;
     var scale = 1;
     if (size > sizeData.default) {
@@ -91,7 +94,7 @@ AFRAME.registerComponent('ar-paint-controls', {
       return;
     }
     if (!el.components.brush.active) {
-      el.components.brush.sizeModifier = 1;
+      el.components.brush.sizeModifier = 0;
       el.components.brush.startNewStroke();
       el.components.brush.active = true;
       this.playSound('#uiPaint');
@@ -120,17 +123,21 @@ AFRAME.registerComponent('ar-paint-controls', {
       t = e.touches[0];
     }
     this.pointer.set(t.clientX, t.clientY);
-    this.pointerNdc.x = (t.clientX / this.size.width) * 2 - 1;
-    this.pointerNdc.y = -(t.clientY / this.size.height) * 2 + 1;
+    this.normalizedCoordinatedPositionPointer.x = (t.clientX / this.size.width) * 2 - 1;
+    this.normalizedCoordinatedPositionPointer.y = -(t.clientY / this.size.height) * 2 + 1;
 
-    this.raycaster.setFromCamera(this.pointerNdc, this.el.sceneEl.camera);
+    this.raycaster.setFromCamera(this.normalizedCoordinatedPositionPointer, this.el.sceneEl.camera);
 
     var intersections = this.raycaster.intersectObjects(this.getIntersectObjects(), true);
     this.intersection = (intersections.length) > 0 ? intersections[ 0 ] : null;
     if (this.intersection !== null) {
       return;
     }
-
+    if (e.touches && e.touches[0].touchType === 'stylus'){
+      el.components.brush.sizeModifier = this.pressure;
+    } else {
+      el.components.brush.sizeModifier = 1;
+    }
     el.object3D.position.copy(this.ray.direction);
     el.object3D.position.multiplyScalar(0.75);
     el.object3D.position.add(this.ray.origin);
